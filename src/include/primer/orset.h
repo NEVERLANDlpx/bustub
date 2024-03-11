@@ -60,6 +60,9 @@ class ORSet {
 
  private:
   // TODO(student): Add your private memeber variables to represent ORSet.
+  std::vector<std::pair<T, int> > e_;
+  std::vector<std::pair<T, int> > t_;
+  // todo end
 };
 
 }  // namespace bustub
