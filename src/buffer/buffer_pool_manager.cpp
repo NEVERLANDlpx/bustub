@@ -55,13 +55,7 @@ auto BufferPoolManager::NewPage(page_id_t *page_id) -> Page * {
     Page* old=&pages_[ind];
         if(old->is_dirty_)//write to disk
        {
-         //DiskRequest d;
-         //d.is_write_=true;
-         //d.page_id_=old->page_id_;
-         //d.data_=old->data_;
-         //d.callback_.set_value(false);
-         //disk_scheduler_->Schedule(std::move(d));
-	 //modified
+         
 	 auto promise=disk_scheduler_->CreatePromise();
     auto future=promise.get_future();
     printf("%d %d\n",ind,pages_[ind].page_id_);
@@ -109,12 +103,6 @@ auto BufferPoolManager::FetchPage(page_id_t page_id, [[maybe_unused]] AccessType
     Page &tar=pages_[page_table_[page_id]];
        if(tar.is_dirty_)//write to disk
        {
-         //old.is_write_=true;
-         //old.page_id_=tar.page_id_;
-         //old.data_=tar.data_;
-         //old.callback_.set_value(false);
-         //disk_scheduler_->Schedule(std::move(old));//write to disk
-	 //modified
          tar.is_dirty_=false;auto promise=disk_scheduler_->CreatePromise();
     auto future=promise.get_future();
     printf("%d %d\n",ind,pages_[ind].page_id_);
@@ -131,11 +119,7 @@ auto BufferPoolManager::FetchPage(page_id_t page_id, [[maybe_unused]] AccessType
     //pages_[ind].data_=new char[BUSTUB_PAGE_SIZE];modified
     pages_[ind].pin_count_++;//modified
     
-    //DiskRequest xin;
-    //xin.is_write_=false;
-    //xin.page_id_=page_id;
-    //xin.data_=pages_[ind].data_;//modified
-    //disk_scheduler_->Schedule(std::move(xin));  //read from disk
+  
     printf("*\n");
     auto promise=disk_scheduler_->CreatePromise();
     auto future=promise.get_future();
@@ -170,25 +154,13 @@ auto BufferPoolManager::FlushPage(page_id_t page_id) -> bool {
     if(page_id==INVALID_PAGE_ID) return false;
     if(page_table_.find(page_id)==page_table_.end()) return false;//not found in table
     Page *fp=&pages_[page_table_[page_id]];
-         //DiskRequest d;
-         //d.is_write_=true;
-         //d.page_id_=page_id;
-         //d.data_=fp->data_;
+         
     auto promise=disk_scheduler_->CreatePromise();
     auto future=promise.get_future();
     //printf("%x\n",pages_[ind].data_);
     disk_scheduler_->Schedule({true,fp->data_,page_id,std::move(promise)});
     future.get();
-         //printf("%d f%cf\n",page_id,*fp->data_);
-         //d.callback_.set_value(false);modified
-         //disk_scheduler_->Schedule(std::move(d));//flush
-         //*fp->data_='a';
-         //DiskRequest test;
-         //test.is_write_=false;
-         //test.page_id_=page_id;
-         //test.data_=fp->data_;
-         //disk_scheduler_->Schedule(std::move(test));
-         //printf("%d f%cf\n",page_id,*fp->data_);
+        
          
          pages_[page_table_[page_id]].is_dirty_=false;//unset
   return true; 
