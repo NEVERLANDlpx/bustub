@@ -64,6 +64,9 @@ auto LRUKReplacer::Evict(frame_id_t *frame_id) -> bool {
      }
        if(flag) { 
        *frame_id=ind;
+       node_store_[ind].history_.clear();
+       node_store_[ind].is_evictable_=false;
+       curr_size_--;
        //Remove(ind); modified
        }
     return flag;
