@@ -64,7 +64,7 @@ auto BufferPoolManager::NewPage(page_id_t *page_id) -> Page * {
 	 //modified
 	 auto promise=disk_scheduler_->CreatePromise();
     auto future=promise.get_future();
-    printf("%d %d\n",ind,pages_[ind].page_id_);
+   // printf("%d %d\n",ind,pages_[ind].page_id_);
     disk_scheduler_->Schedule({true,old->data_,old->page_id_,std::move(promise)});
     //disk_scheduler_->Schedule({false,new char,0,std::move(promise)});
     future.get();
@@ -117,7 +117,7 @@ auto BufferPoolManager::FetchPage(page_id_t page_id, [[maybe_unused]] AccessType
 	 //modified
          tar.is_dirty_=false;auto promise=disk_scheduler_->CreatePromise();
     auto future=promise.get_future();
-    printf("%d %d\n",ind,pages_[ind].page_id_);
+    //printf("%d %d\n",ind,pages_[ind].page_id_);
     disk_scheduler_->Schedule({true,tar.data_,tar.page_id_,std::move(promise)});
     //disk_scheduler_->Schedule({false,new char,0,std::move(promise)});
     future.get();
@@ -136,7 +136,7 @@ auto BufferPoolManager::FetchPage(page_id_t page_id, [[maybe_unused]] AccessType
     //xin.page_id_=page_id;
     //xin.data_=pages_[ind].data_;//modified
     //disk_scheduler_->Schedule(std::move(xin));  //read from disk
-    printf("*\n");
+  //  printf("*\n");
     auto promise=disk_scheduler_->CreatePromise();
     auto future=promise.get_future();
     printf("%d %d\n",ind,pages_[ind].page_id_);
@@ -228,12 +228,54 @@ auto BufferPoolManager::DeletePage(page_id_t page_id) -> bool {
 
 auto BufferPoolManager::AllocatePage() -> page_id_t { return next_page_id_++; }
 
-auto BufferPoolManager::FetchPageBasic(page_id_t page_id) -> BasicPageGuard { return {this, nullptr}; }
+auto BufferPoolManager::FetchPageBasic(page_id_t page_id) -> BasicPageGuard { 
+ Page *fetched_page = FetchPage(page_id);
+    if (!fetched_page) {
+        // If fetching fails, return an empty BasicPageGuard
+        return BasicPageGuard(this,nullptr);
+    }
+    
+    // Otherwise, return a BasicPageGuard holding the fetched page
+    return BasicPageGuard(this,fetched_page);
+//return {this, nullptr}; 
+}
 
-auto BufferPoolManager::FetchPageRead(page_id_t page_id) -> ReadPageGuard { return {this, nullptr}; }
+auto BufferPoolManager::FetchPageRead(page_id_t page_id) -> ReadPageGuard {
+ // Fetch the page using FetchPage function with read latch
+    Page *fetched_page = FetchPage(page_id);
+    if (!fetched_page) {
+        // If fetching fails, return an empty ReadPageGuard
+        return ReadPageGuard(this,nullptr);
+    }
+    
+    // Otherwise, return a ReadPageGuard holding the fetched page
+    return ReadPageGuard(this,fetched_page);
+ //return {this, nullptr}; 
+}
 
-auto BufferPoolManager::FetchPageWrite(page_id_t page_id) -> WritePageGuard { return {this, nullptr}; }
+auto BufferPoolManager::FetchPageWrite(page_id_t page_id) -> WritePageGuard { 
+ // Fetch the page using FetchPage function with write latch
+    Page *fetched_page = FetchPage(page_id);
+    if (!fetched_page) {
+        // If fetching fails, return an empty WritePageGuard
+        return WritePageGuard(this,nullptr);
+    }
+    
+    // Otherwise, return a WritePageGuard holding the fetched page
+    return WritePageGuard(this,fetched_page);
+//return {this, nullptr};
+ }
 
-auto BufferPoolManager::NewPageGuarded(page_id_t *page_id) -> BasicPageGuard { return {this, nullptr}; }
+auto BufferPoolManager::NewPageGuarded(page_id_t *page_id) -> BasicPageGuard { 
+  Page *new_page = NewPage(page_id);
+    if (!new_page) {
+        // If allocation fails, return an empty BasicPageGuard
+        return BasicPageGuard(this,nullptr);
+    }
+    
+    // Otherwise, return a BasicPageGuard holding the new page
+    return BasicPageGuard(this,new_page);
+//return {this, nullptr};
+ }
 
 }  // namespace bustub
