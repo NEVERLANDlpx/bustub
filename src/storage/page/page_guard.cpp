@@ -11,9 +11,10 @@ BasicPageGuard::BasicPageGuard(BasicPageGuard &&that) noexcept {
 
 void BasicPageGuard::Drop() {
  if (page_ && bpm_) {
-        if (is_dirty_) {
+    /*    if (is_dirty_) {
             bpm_->FlushPage(page_->GetPageId());
         }
+     */
         bpm_->UnpinPage(page_->GetPageId(), is_dirty_);
         bpm_ = nullptr;
         page_ = nullptr;
@@ -35,7 +36,7 @@ auto BasicPageGuard::operator=(BasicPageGuard &&that) noexcept -> BasicPageGuard
 }
 
 BasicPageGuard::~BasicPageGuard(){
-   Drop();
+   if(bpm_&&page_) Drop();
 };  // NOLINT
 
 auto BasicPageGuard::UpgradeRead() -> ReadPageGuard { 
@@ -62,7 +63,7 @@ void ReadPageGuard::Drop() {
 }
 
 ReadPageGuard::~ReadPageGuard() {
-     Drop();
+   if(guard_.bpm_&&guard_.page_)  Drop();
 }  // NOLINT
 
 WritePageGuard::WritePageGuard(BufferPoolManager *bpm, Page *page): guard_(bpm, page) {    guard_.page_->WLatch();  }
@@ -83,7 +84,7 @@ void WritePageGuard::Drop() {
 }
 
 WritePageGuard::~WritePageGuard() {
-  Drop();
+ if(guard_.bpm_&&guard_.page_)  Drop();
 }  // NOLINT
 
 }  // namespace bustub
