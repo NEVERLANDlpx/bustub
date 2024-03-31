@@ -69,6 +69,7 @@ auto LRUKReplacer::Evict(frame_id_t *frame_id) -> bool {
        curr_size_--;
        //Remove(ind); modified
        }
+       else *frame_id=0;
     return flag;
   
 }
@@ -95,7 +96,7 @@ void LRUKReplacer::SetEvictable(frame_id_t frame_id, bool set_evictable) {
      auto iterator = node_store_.find(frame_id);  
      if(iterator == node_store_.end())
     throw std::runtime_error("Invalid frame_id: " + std::to_string(frame_id)); 
-    // latch_.lock();
+     latch_.lock();
      if(set_evictable&&node_store_[frame_id].is_evictable_==false) 
      {
       curr_size_++;
@@ -106,22 +107,23 @@ void LRUKReplacer::SetEvictable(frame_id_t frame_id, bool set_evictable) {
       curr_size_--;
       node_store_[frame_id].is_evictable_=set_evictable;
      } 
-    // latch_.lock();
+     latch_.unlock();
 }
 
 void LRUKReplacer::Remove(frame_id_t frame_id) {
+
+  auto iterator = node_store_.find(frame_id);  
+   if(iterator == node_store_.end()) return;
+   
   if(node_store_[frame_id].is_evictable_==false)
     throw std::runtime_error("Invalid frame_id: " + std::to_string(frame_id)); 
     
-   auto iterator = node_store_.find(frame_id);  
-   if(iterator == node_store_.end()) return;
-   
-   //latch_.lock();
+   latch_.lock();
    node_store_[frame_id].history_.clear();
    //printf("*\n");
    node_store_.erase(frame_id);
    curr_size_--;
-   //latch_.unlock();
+   latch_.unlock();
 }
 
 auto LRUKReplacer::Size() -> size_t {     return curr_size_; }
