@@ -26,7 +26,7 @@ namespace bustub {
 // NOLINTNEXTLINE
 auto Planner::GetFuncCallFromFactory(const std::string &func_name, std::vector<AbstractExpressionRef> args)
     -> AbstractExpressionRef {
-  
+
 // 1. check if the parsed function name is "lower" or "upper".
       if (func_name != "lower" && func_name != "upper") {
           throw Exception(fmt::format("Unsupported function name.", func_name)); 
