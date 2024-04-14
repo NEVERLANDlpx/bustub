@@ -24,8 +24,9 @@ namespace bustub {
 void ExtendibleHTableDirectoryPage::Init(uint32_t max_depth) {
   //throw NotImplementedException("ExtendibleHTableDirectoryPage is not implemented");
   max_depth_=max_depth;
+ // printf("(1<<max_depth)-1:%u\n",(1<<max_depth)-1);
     for (auto& id : bucket_page_ids_) {
-      id = 0;
+      id = INVALID_PAGE_ID;
     }
      for (auto& id :local_depths_) {
       id = 0;
@@ -43,7 +44,9 @@ auto ExtendibleHTableDirectoryPage::HashToBucketIndex(uint32_t hash) const -> ui
 
 auto ExtendibleHTableDirectoryPage::GetBucketPageId(uint32_t bucket_idx) const -> page_id_t { 
   if(bucket_idx>=HTABLE_DIRECTORY_ARRAY_SIZE)  {
-    throw std::out_of_range("Bucket index out of range");  
+    //throw std::out_of_range("Bucket index out of range");  
+  //  std::cout<<"INVALID_PAGE_ID"<<INVALID_PAGE_ID<<std::endl;
+    return INVALID_PAGE_ID;
   }
   return bucket_page_ids_[bucket_idx];
 //return INVALID_PAGE_ID; 
@@ -51,7 +54,8 @@ auto ExtendibleHTableDirectoryPage::GetBucketPageId(uint32_t bucket_idx) const -
 
 void ExtendibleHTableDirectoryPage::SetBucketPageId(uint32_t bucket_idx, page_id_t bucket_page_id) {
   if(bucket_idx>=HTABLE_DIRECTORY_ARRAY_SIZE)  {
-    throw std::out_of_range("Bucket index out of range");  
+    //throw std::out_of_range("Bucket index out of range");  
+    return;
   }
   bucket_page_ids_[bucket_idx]=bucket_page_id;
   //throw NotImplementedException("ExtendibleHTableDirectoryPage is not implemented");
@@ -60,6 +64,8 @@ void ExtendibleHTableDirectoryPage::SetBucketPageId(uint32_t bucket_idx, page_id
 auto ExtendibleHTableDirectoryPage::GetSplitImageIndex(uint32_t bucket_idx) const -> uint32_t { 
  // 获取给定目录索引的分裂镜像索引
   /* if(local_depths_[bucket_idx]==global_depth_) IncrLocalDepth(bucket_idx);*/
+  if(bucket_page_ids_[bucket_idx]==INVALID_PAGE_ID) return INVALID_PAGE_ID;
+  if(local_depths_[bucket_idx]==0) return 0;
    uint32_t highest_bit = 1 << (local_depths_[bucket_idx] - 1);
         return bucket_idx ^ highest_bit;
 //return 0; 
@@ -82,6 +88,11 @@ void ExtendibleHTableDirectoryPage::IncrGlobalDepth() {
 
 void ExtendibleHTableDirectoryPage::DecrGlobalDepth() {
   if(CanShrink()) global_depth_--;
+  for(int i=Size();i<2*Size()-1;i++)
+  {
+    bucket_page_ids_[i] =INVALID_PAGE_ID;
+    local_depths_[i]=0;
+  }
   //throw NotImplementedException("ExtendibleHTableDirectoryPage is not implemented");
 }
 
@@ -132,7 +143,7 @@ auto ExtendibleHTableDirectoryPage::GetLocalDepthMask(uint32_t bucket_idx) const
     uint32_t local_depth = local_depths_[bucket_idx];
     return (1 << local_depth) - 1;
 }
-
+/*
 void ExtendibleHTableDirectoryPage::VerifyIntegrity() const {
    std::map<page_id_t,int> m;
     for (uint32_t i = 0; i <Size(); i++) {
@@ -153,5 +164,6 @@ void ExtendibleHTableDirectoryPage::VerifyIntegrity() const {
       for(int i=0;i<Size();i++)
       assert(m[bucket_page_ids_[i]]==1<<(GetGlobalDepth()-GetLocalDepth()));
 }
+*/
 //add func end
 }  // namespace bustub

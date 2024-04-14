@@ -20,12 +20,12 @@ void ExtendibleHTableHeaderPage::Init(uint32_t max_depth) {
   //throw NotImplementedException("ExtendibleHTableHeaderPage is not implemented");
   max_depth_=max_depth;
    for (auto& id : directory_page_ids_) {
-      id = 0;
+      id = INVALID_PAGE_ID;
     }
 }
 
 auto ExtendibleHTableHeaderPage::HashToDirectoryIndex(uint32_t hash) const -> uint32_t { 
-   std::cout<<"HashToDirectoryIndex"<<((hash >> (32 - max_depth_)) & ((1 << max_depth_) - 1))<<std::endl;
+  // std::cout<<"HashToDirectoryIndex"<<((hash >> (32 - max_depth_)) & ((1 << max_depth_) - 1))<<std::endl;
     return ((hash >> (32 - max_depth_)) & ((1 << max_depth_) - 1));
 //return 0; 
 }
@@ -33,8 +33,12 @@ auto ExtendibleHTableHeaderPage::HashToDirectoryIndex(uint32_t hash) const -> ui
 auto ExtendibleHTableHeaderPage::GetDirectoryPageId(uint32_t directory_idx) const -> uint32_t { 
   if (directory_idx >= MaxSize()) {  
     // 抛出异常或返回错误值  
-    throw std::out_of_range("Directory index out of range");  
+    //throw std::out_of_range("Directory index out of range");  
+//    printf("%u\n",directory_idx);
+  //   std::cout<<"header_INVALID_PAGE_ID"<<INVALID_PAGE_ID<<std::endl;
+    return INVALID_PAGE_ID;
   }  
+   
    return directory_page_ids_[directory_idx];
 //return 0; 
 }
@@ -43,14 +47,15 @@ void ExtendibleHTableHeaderPage::SetDirectoryPageId(uint32_t directory_idx, page
   //throw NotImplementedException("ExtendibleHTableHeaderPage is not implemented");
    if (directory_idx >= MaxSize()) {  
     // 抛出异常或返回错误  
-    throw std::out_of_range("Directory index out of range");  
+    //throw std::out_of_range("Directory index out of range");  
+    return ;
   }  
    directory_page_ids_[directory_idx]=directory_page_id;
 }
 
 
 auto ExtendibleHTableHeaderPage::MaxSize() const -> uint32_t { 
-   return max_depth_;
+   return 1<<max_depth_;
 //return 0; 
 }
 
