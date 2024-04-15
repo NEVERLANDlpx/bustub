@@ -100,9 +100,9 @@ auto DiskExtendibleHashTable<K, V, KC>::GetValue(const K &key, std::vector<V> *r
 
 template <typename K, typename V, typename KC>
 auto DiskExtendibleHashTable<K, V, KC>::Insert(const K &key, const V &value, Transaction *transaction) -> bool {
-//   std::cout<<"insert begin";
+   //std::cout<<"insert begin";
     uint32_t hash_val=Hash(key);
-//    printf("%u\n",hash_val);
+  //  printf("%u\n",hash_val);
     WritePageGuard header_guard=bpm_->FetchPageWrite(header_page_id_);  
     auto header_page=header_guard.AsMut< ExtendibleHTableHeaderPage>();
     header_guard.Drop();
@@ -125,13 +125,21 @@ auto DiskExtendibleHashTable<K, V, KC>::Insert(const K &key, const V &value, Tra
      auto bucket_page=bucket_guard.AsMut<ExtendibleHTableBucketPage<K,V,KC>>();
      bucket_guard.Drop();
      V v;
+     
      if(bucket_page->Insert(key,value,cmp_)) return true;
      else if(bucket_page->Lookup(key,v,cmp_)) return false;
     
      //split
    //  std::cout<<"split"; printf("%u\n",hash_val);
      auto local_mask=directory_page->GetLocalDepthMask(bucket_idx);
-     directory_page->IncrLocalDepth(bucket_idx);
+     if(directory_page->GetLocalDepth(bucket_idx)==directory_max_depth_)  return false;//the table is full
+        
+     //directory_page->IncrLocalDepth(bucket_idx);
+     for(int i=0;i<directory_page->Size();i++)
+     {
+       if(directory_page->GetBucketPageId(i)==bucket_page_id)
+       directory_page->IncrLocalDepth(i);
+     }
 
      page_id_t new_page_id;
      BasicPageGuard new_guard=bpm_->NewPageGuarded(&new_page_id);
@@ -141,8 +149,12 @@ auto DiskExtendibleHashTable<K, V, KC>::Insert(const K &key, const V &value, Tra
      new_page_guard.Drop();
      new_page->Init(bucket_max_size_);
      uint32_t new_idx=directory_page->GetSplitImageIndex(bucket_idx);
-     directory_page->SetBucketPageId(new_idx,new_page_id);
-  
+      // directory_page->SetBucketPageId(new_idx,new_page_id);
+     for(int i=new_idx;i<directory_page->Size();i++)
+     {
+       if( (i&directory_page->GetLocalDepthMask(i) ) ==( new_idx&directory_page->GetLocalDepthMask(i) ) ) directory_page->SetBucketPageId(i,new_page_id);
+     }
+   
         std::vector<K> tonew;
         std::vector<V> tonew_value;
         for(int i=0;i<bucket_page->Size();i++)
@@ -162,9 +174,19 @@ auto DiskExtendibleHashTable<K, V, KC>::Insert(const K &key, const V &value, Tra
        bucket_page->Remove(tonew[i],cmp_);
      }
      uint32_t now_bucket_idx=directory_page->HashToBucketIndex(hash_val);
-     if(now_bucket_idx==bucket_idx) return bucket_page->Insert(key,value,cmp_);
-     else return new_page->Insert(key,value,cmp_);
-     
+     if(now_bucket_idx==bucket_idx) 
+     {
+       if( bucket_page->Insert(key,value,cmp_) ) return true;
+       if( directory_page->GetGlobalDepth() == directory_max_depth_ ) return false;
+       return Insert(key,value,transaction);
+     }
+     else
+     { 
+       if( new_page->Insert(key,value,cmp_) ) return true;
+       if( directory_page->GetGlobalDepth() == directory_max_depth_ ) return false;
+       return Insert(key,value,transaction);
+     }
+
 //  return false;
 }
 //add begin
@@ -177,7 +199,8 @@ template <typename K, typename V, typename KC>
 template <typename K, typename V, typename KC>
 auto DiskExtendibleHashTable<K, V, KC>::InsertToNewDirectory(ExtendibleHTableHeaderPage *header, uint32_t directory_idx,
                                                              uint32_t hash, const K &key, const V &value) -> bool {
- // std::cout<<"InsertToNewDirectory"<<key<<std::endl;
+  // std::cout<<"InsertToNewDirectory"<<key<<std::endl;                                                           
+  if(directory_idx >= ( 1<<directory_max_depth_) ) return false;
   page_id_t directory_page_id;                                                            
   auto new_guard=bpm_->NewPageGuarded(&directory_page_id);
   auto directory_guard=bpm_->FetchPageWrite(directory_page_id);
@@ -200,8 +223,6 @@ auto DiskExtendibleHashTable<K, V, KC>::InsertToNewBucket(ExtendibleHTableDirect
   auto bucket_guard=bpm_->FetchPageWrite(bucket_page_id);
   auto bucket_page=bucket_guard.AsMut<ExtendibleHTableBucketPage<K,V,KC>>();
   bucket_guard.Drop();
-  //WritePageGuard bucket_guard=new_guard.UpgradeWrite();
-  //ExtendibleHTableBucketPage<K,V,KC> bucket_page=bucket_guard.AsMut<ExtendibleHTableBucketPage<K,V,KC>>();
   bucket_page->Init(bucket_max_size_);
   directory->SetLocalDepth(bucket_idx,0);
   directory->SetBucketPageId(bucket_idx,bucket_page_id);
@@ -225,6 +246,7 @@ void MigrateEntries(ExtendibleHTableBucketPage<K, V, KC> *old_bucket,ExtendibleH
  *****************************************************************************/
 template <typename K, typename V, typename KC>
 auto DiskExtendibleHashTable<K, V, KC>::Remove(const K &key, Transaction *transaction) -> bool {
+ //   std::cout<<"remove"<<std::endl;
     uint32_t hash_val=Hash(key);
     WritePageGuard header_guard=bpm_->FetchPageWrite(header_page_id_);
     auto header_page=header_guard.AsMut<ExtendibleHTableHeaderPage>();
@@ -245,38 +267,47 @@ auto DiskExtendibleHashTable<K, V, KC>::Remove(const K &key, Transaction *transa
     //remove success
    
     //merge
-    while(true)
-    {//std::cout<<"begin"<<std::endl;
+
+    if(!bucket_page->IsEmpty()) return true;
+  
+
       page_id_t image_id=directory_page->GetSplitImageIndex(bucket_idx);
+     
      // printf("image_id:%u\n",image_id);
       
       WritePageGuard image_guard=bpm_->FetchPageWrite(image_id);
       auto image_page=image_guard.AsMut<ExtendibleHTableBucketPage<K,V,KC>>(); 
       image_guard.Drop();
-     
-      if(bucket_page->IsEmpty()&&image_page->IsEmpty()&&directory_page->GetLocalDepth(bucket_page_id)==directory_page->GetLocalDepth(image_id))
+      if(image_id==0) return true;
+      if(image_id==bucket_page_id) return true;
+     // if(bucket_page->IsEmpty()&&image_page->IsEmpty()&&directory_page->GetLocalDepth(bucket_page_id)==directory_page->GetLocalDepth(image_id))
+     if(bucket_page->IsEmpty()&&directory_page->GetLocalDepth(bucket_page_id)==directory_page->GetLocalDepth(image_id))
       {
-        std::cout<<"haha"<<std::endl;
-        directory_page->DecrLocalDepth(bucket_page_id);
-        directory_page->DecrLocalDepth(image_id);
-        for(int i=0;i<directory_page->Size();i++)
+        // std::cout<<"merge"<<std::endl;  std::cout<<bucket_page_id<<"|"; std::cout<<image_id<<std::endl;
+         for(int i=0;i<image_page->Size();i++)  //Migration Entry from image to bucket
+         { 
+           bool flag;
+           flag=bucket_page->Insert(image_page->KeyAt(0),image_page->ValueAt(0),cmp_);
+           image_page->RemoveAt(0);
+         }
+ 
+        for(int i=0;i<directory_page->Size();i++)  //Update Mapping
         {
-          if(directory_page->GetBucketPageId(i)==image_id)
-          {
-            directory_page->SetBucketPageId(i,bucket_page_id);
-          }
+           if(directory_page->GetBucketPageId(i)==image_id||directory_page->GetBucketPageId(i)==bucket_page_id)
+           {
+              directory_page->SetBucketPageId(i,bucket_page_id);
+              directory_page->DecrLocalDepth(i);
+           }
         }
+        if(directory_page->CanShrink()) directory_page->DecrGlobalDepth(); //Shrink
+    
         //recursion
         bucket_idx=directory_page->HashToBucketIndex(hash_val);  
         bucket_page_id = directory_page->GetBucketPageId(bucket_idx); 
         bucket_guard=bpm_->FetchPageWrite(bucket_page_id);
         bucket_page=bucket_guard.AsMut<ExtendibleHTableBucketPage<K,V,KC>>();
          bucket_guard.Drop();
-         break;
       }
-      else break;
-    }
- 
     return true;
   //return false;
 }
