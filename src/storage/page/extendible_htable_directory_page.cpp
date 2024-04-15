@@ -87,12 +87,14 @@ void ExtendibleHTableDirectoryPage::IncrGlobalDepth() {
 }
 
 void ExtendibleHTableDirectoryPage::DecrGlobalDepth() {
-  if(CanShrink()) global_depth_--;
+  //if(CanShrink()) 
+  global_depth_--;
   for(int i=Size();i<2*Size()-1;i++)
   {
     bucket_page_ids_[i] =INVALID_PAGE_ID;
     local_depths_[i]=0;
   }
+  
   //throw NotImplementedException("ExtendibleHTableDirectoryPage is not implemented");
 }
 
@@ -131,7 +133,7 @@ void ExtendibleHTableDirectoryPage::IncrLocalDepth(uint32_t bucket_idx) {
 
 void ExtendibleHTableDirectoryPage::DecrLocalDepth(uint32_t bucket_idx) {
    local_depths_[bucket_idx]--;
-   DecrGlobalDepth();
+   //DecrGlobalDepth();
   //throw NotImplementedException("ExtendibleHTableDirectoryPage is not implemented");
 }
 //add func begin
