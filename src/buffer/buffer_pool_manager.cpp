@@ -36,13 +36,13 @@ BufferPoolManager::BufferPoolManager(size_t pool_size, DiskManager *disk_manager
   }
 }
 
-BufferPoolManager::~BufferPoolManager() { delete[] pages_; }
+BufferPoolManager::~BufferPoolManager() { delete[] pages_; pages_=nullptr; }
 
 auto BufferPoolManager::NewPage(page_id_t *page_id) -> Page * {
   latch_.lock();
   Page *p=new Page;
   p->page_id_=AllocatePage();
-  p->pin_count_=1;
+  p->pin_count_++;
   frame_id_t ind;
   if(!free_list_.empty())
   {
@@ -68,7 +68,7 @@ auto BufferPoolManager::NewPage(page_id_t *page_id) -> Page * {
     disk_scheduler_->Schedule({true,old->data_,old->page_id_,std::move(promise)});
     future.get();//阻塞当前线程，直到对应的异步操作完成
     }
-    page_table_.erase(old->page_id_);
+    page_table_.erase(old->page_id_);//update the mapping
     pages_[ind].ResetMemory();
     pages_[ind].page_id_=p->page_id_;
     pages_[ind].pin_count_=1;
@@ -89,7 +89,7 @@ auto BufferPoolManager::NewPage(page_id_t *page_id) -> Page * {
 auto BufferPoolManager::FetchPage(page_id_t page_id, [[maybe_unused]] AccessType access_type) -> Page * {
   frame_id_t ind;
   latch_.lock();
-  if(page_table_.find(page_id)==page_table_.end())//not found in pool
+  if(page_table_.find(page_id)==page_table_.end())//not found in pool,make room for it
   {
     if(!free_list_.empty())
     {
@@ -105,7 +105,7 @@ auto BufferPoolManager::FetchPage(page_id_t page_id, [[maybe_unused]] AccessType
       }
     }
     Page* old=&pages_[ind];
-    if(old->is_dirty_)//write to disk
+    if(old->is_dirty_)//old write to disk
    {
     auto promise=disk_scheduler_->CreatePromise();
     auto future=promise.get_future();
@@ -118,21 +118,21 @@ auto BufferPoolManager::FetchPage(page_id_t page_id, [[maybe_unused]] AccessType
     pages_[ind].ResetMemory();
     pages_[ind].page_id_=page_id;
     pages_[ind].pin_count_=1;
-    
+    //new write to disk
     auto promise=disk_scheduler_->CreatePromise();
     auto future=promise.get_future();
     disk_scheduler_->Schedule({false,pages_[ind].GetData(),pages_[ind].page_id_,std::move(promise)});
     future.get();
     
     page_table_[page_id]=ind;
+    latch_.unlock();
+    return &(pages_[page_table_[page_id]]);
   }
-  else
-  {
-
-    replacer_->RecordAccess(page_table_[page_id]);  // calc replacer
+  //already in pool
     replacer_->SetEvictable(page_table_[page_id], false);
-    pages_[page_table_[page_id]].pin_count_++;  // record pin_count_
-  }
+    replacer_->RecordAccess(page_table_[page_id]);  
+    pages_[page_table_[page_id]].pin_count_++;  
+  
   latch_.unlock();
  return &(pages_[page_table_[page_id]]);
 }
@@ -186,7 +186,7 @@ auto BufferPoolManager::FlushPage(page_id_t page_id) -> bool {
 void BufferPoolManager::FlushAllPages() {
   latch_.lock();
   for (auto id : page_table_) {
-    Page *fp=&pages_[id.second];  // flush all;
+    Page *fp=&pages_[id.second];  
     auto promise = disk_scheduler_->CreatePromise();
     auto future = promise.get_future();
     disk_scheduler_->Schedule({true, fp->data_, fp->page_id_, std::move(promise)});
