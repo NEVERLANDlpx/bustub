@@ -43,10 +43,9 @@ auto ExtendibleHTableBucketPage<K, V, KC>::Lookup(const K &key, V &value, const 
 
 template <typename K, typename V, typename KC>
 auto ExtendibleHTableBucketPage<K, V, KC>::Insert(const K &key, const V &value, const KC &cmp) -> bool {
- //  std::cout<<"1|";
-   printf("%u %u",size_,max_size_);
+
   if(size_==max_size_) return false;
-//  std::cout<<"|2"<<std::endl;
+
   for(int i=0;i<size_;i++)
   {
     if(cmp(array_[i].first,key)==0)
@@ -68,7 +67,6 @@ auto ExtendibleHTableBucketPage<K, V, KC>::Remove(const K &key, const KC &cmp) -
     {
       std::swap(array_[i],array_[size_-1]);
       size_--;
-  //    printf("remove :%u\n",key);
       return true;
     }
   }
