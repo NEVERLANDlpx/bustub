@@ -25,19 +25,15 @@ void ExtendibleHTableHeaderPage::Init(uint32_t max_depth) {
 }
 
 auto ExtendibleHTableHeaderPage::HashToDirectoryIndex(uint32_t hash) const -> uint32_t { 
-
     if(32-max_depth_==32) return 0;
     return (hash >> (32 - max_depth_)); 
-
 }
 
 auto ExtendibleHTableHeaderPage::GetDirectoryPageId(uint32_t directory_idx) const -> uint32_t { 
   if (directory_idx >= MaxSize()) {  
     // 抛出异常或返回错误值  
-
     return INVALID_PAGE_ID;
   }  
-   
    return directory_page_ids_[directory_idx];
 //return 0; 
 }
@@ -45,7 +41,6 @@ auto ExtendibleHTableHeaderPage::GetDirectoryPageId(uint32_t directory_idx) cons
 void ExtendibleHTableHeaderPage::SetDirectoryPageId(uint32_t directory_idx, page_id_t directory_page_id) {
   //throw NotImplementedException("ExtendibleHTableHeaderPage is not implemented");
    if (directory_idx >= MaxSize()) {  
-
     return ;
   }  
    directory_page_ids_[directory_idx]=directory_page_id;
