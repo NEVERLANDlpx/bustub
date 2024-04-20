@@ -4,18 +4,18 @@
 namespace bustub {
 
 BasicPageGuard::BasicPageGuard(BasicPageGuard &&that) noexcept {
+
     bpm_ = std::exchange(that.bpm_, nullptr);
     page_ = std::exchange(that.page_, nullptr);
     is_dirty_ = std::exchange(that.is_dirty_, false);
     origin_ = std::exchange( that.origin_ , false);
-
 }
 
 void BasicPageGuard::Drop() {
   if (!origin_) {
     return;
   }
-  bpm_->UnpinPage(page_->GetPageId(), is_dirty_);
+  if(bpm_&&page_ ) bpm_->UnpinPage(page_->GetPageId(), is_dirty_);
   origin_ = false;
 }
 
@@ -54,7 +54,7 @@ auto ReadPageGuard::operator=(ReadPageGuard &&that) noexcept -> ReadPageGuard & 
 
 void ReadPageGuard::Drop() {
   if (guard_.origin_) {
-    guard_.page_->RUnlatch();
+    if(guard_.page_) guard_.page_->RUnlatch();
     guard_.Drop();
   }
 }
@@ -74,7 +74,7 @@ auto WritePageGuard::operator=(WritePageGuard &&that) noexcept -> WritePageGuard
 
 void WritePageGuard::Drop() {
   if (guard_.origin_) {
-    guard_.page_->WUnlatch();
+    if(guard_.page_) guard_.page_->WUnlatch();
     guard_.Drop();
   }
 }
