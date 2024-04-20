@@ -22,7 +22,7 @@ auto BasicPageGuard::operator=(BasicPageGuard &&that) noexcept -> BasicPageGuard
   // Drop();
     bpm_ = that.bpm_;
     page_ = that.page_;
-    is_dirty_ =that.is_dirty_;
+    is_dirty_ = that.is_dirty_;
     origin_ = std::exchange( that.origin_ , false);
 
   return *this;
@@ -42,7 +42,13 @@ auto BasicPageGuard::UpgradeWrite() -> WritePageGuard {
 
 ReadPageGuard::ReadPageGuard(BufferPoolManager *bpm, Page *page) : guard_(bpm, page) { page->RLatch(); }
 
-ReadPageGuard::ReadPageGuard(ReadPageGuard &&that) noexcept = default;
+//ReadPageGuard::ReadPageGuard(ReadPageGuard &&that) noexcept = default;
+ReadPageGuard::ReadPageGuard(ReadPageGuard &&that) noexcept{
+  guard_.bpm_ =that.guard_.bpm_;
+  guard_.page_ = that.guard_.page_;
+  guard_.is_dirty_ = that.guard_.is_dirty_;
+  guard_.origin_ = std::exchange( that.guard_.origin_, false);
+}
 
 auto ReadPageGuard::operator=(ReadPageGuard &&that) noexcept -> ReadPageGuard & {
   // Drop();
@@ -64,8 +70,13 @@ ReadPageGuard::~ReadPageGuard() { Drop(); }  // NOLINT
 
 WritePageGuard::WritePageGuard(BufferPoolManager *bpm, Page *page) : guard_(bpm, page) { page->WLatch(); }
 
-WritePageGuard::WritePageGuard(WritePageGuard &&that) noexcept = default;
-
+//WritePageGuard::WritePageGuard(WritePageGuard &&that) noexcept = default;
+WritePageGuard::WritePageGuard(WritePageGuard &&that) noexcept {
+  guard_.bpm_ = that.guard_.bpm_;
+  guard_.page_ = that.guard_.page_;
+  guard_.is_dirty_ = that.guard_.is_dirty_;
+  guard_.origin_ = std::exchange( that.guard_.origin_, false);
+}
 auto WritePageGuard::operator=(WritePageGuard &&that) noexcept -> WritePageGuard & {
   // Drop();
   //guard_ = that.guard_;
