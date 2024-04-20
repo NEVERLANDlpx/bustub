@@ -4,7 +4,6 @@
 namespace bustub {
 
 BasicPageGuard::BasicPageGuard(BasicPageGuard &&that) noexcept {
-
     bpm_ = std::exchange(that.bpm_, nullptr);
     page_ = std::exchange(that.page_, nullptr);
     is_dirty_ = std::exchange(that.is_dirty_, false);
@@ -21,9 +20,9 @@ void BasicPageGuard::Drop() {
 
 auto BasicPageGuard::operator=(BasicPageGuard &&that) noexcept -> BasicPageGuard & {
   // Drop();
-    bpm_ = std::exchange(that.bpm_, nullptr);
-    page_ = std::exchange(that.page_, nullptr);
-    is_dirty_ = std::exchange(that.is_dirty_, false);
+    bpm_ = that.bpm_;
+    page_ = that.page_;
+    is_dirty_ =that.is_dirty_;
     origin_ = std::exchange( that.origin_ , false);
 
   return *this;
@@ -47,7 +46,10 @@ ReadPageGuard::ReadPageGuard(ReadPageGuard &&that) noexcept = default;
 
 auto ReadPageGuard::operator=(ReadPageGuard &&that) noexcept -> ReadPageGuard & {
   // Drop();
- guard_ = std::move(that.guard_);
+ //guard_ = that.guard_;
+  guard_.bpm_ = std::exchange(that.guard_.bpm_, nullptr);
+  guard_.page_ = std::exchange(that.guard_.page_, nullptr);
+  guard_.is_dirty_ = std::exchange(that.guard_.is_dirty_, false);
   guard_.origin_ = std::exchange( that.guard_.origin_, false);
   return *this;
 } 
@@ -66,7 +68,10 @@ WritePageGuard::WritePageGuard(WritePageGuard &&that) noexcept = default;
 
 auto WritePageGuard::operator=(WritePageGuard &&that) noexcept -> WritePageGuard & {
   // Drop();
-  guard_ = std::move(that.guard_);
+  //guard_ = that.guard_;
+  guard_.bpm_ = std::exchange(that.guard_.bpm_, nullptr);
+  guard_.page_ = std::exchange(that.guard_.page_, nullptr);
+  guard_.is_dirty_ = std::exchange(that.guard_.is_dirty_, false);
   guard_.origin_ = std::exchange(that.guard_.origin_, false);
 
   return *this;
