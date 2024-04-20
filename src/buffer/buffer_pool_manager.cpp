@@ -59,7 +59,6 @@ auto BufferPoolManager::NewPage(page_id_t *page_id) -> Page * {
     latch_.unlock();
     return nullptr;
     }
-
   }
    Page* old=&pages_[ind];
    if(old->is_dirty_)//write to disk
@@ -67,23 +66,23 @@ auto BufferPoolManager::NewPage(page_id_t *page_id) -> Page * {
     auto promise=disk_scheduler_->CreatePromise();
     auto future=promise.get_future();
     disk_scheduler_->Schedule({true,old->data_,old->page_id_,std::move(promise)});
-    future.get();
+    future.get();//阻塞当前线程，直到对应的异步操作完成
     }
     page_table_.erase(old->page_id_);
     pages_[ind].ResetMemory();
     pages_[ind].page_id_=p->page_id_;
     pages_[ind].pin_count_=1;
        
-  replacer_->RecordAccess(ind);
-  replacer_->SetEvictable(ind,false);
+    replacer_->RecordAccess(ind);
+    replacer_->SetEvictable(ind,false);
   
-  page_table_[p->page_id_]=ind;
-  pages_[ind].page_id_=p->page_id_;
+    page_table_[p->page_id_]=ind;
+    pages_[ind].page_id_=p->page_id_;
   
-  *page_id=p->page_id_;
-  delete p;
-  p=nullptr;
-  latch_.unlock();
+    *page_id=p->page_id_;
+    delete p;
+    p=nullptr;
+    latch_.unlock();
   return &pages_[ind];
 }
 
@@ -112,7 +111,7 @@ auto BufferPoolManager::FetchPage(page_id_t page_id, [[maybe_unused]] AccessType
     auto future=promise.get_future();
     disk_scheduler_->Schedule({true,old->data_,old->page_id_,std::move(promise)});
     future.get();
-    }
+   }
     replacer_->SetEvictable(ind,false);
     replacer_->RecordAccess(ind);
     page_table_.erase(pages_[ind].GetPageId());
@@ -120,7 +119,7 @@ auto BufferPoolManager::FetchPage(page_id_t page_id, [[maybe_unused]] AccessType
     pages_[ind].page_id_=page_id;
     pages_[ind].pin_count_=1;
     
-   auto promise=disk_scheduler_->CreatePromise();
+    auto promise=disk_scheduler_->CreatePromise();
     auto future=promise.get_future();
     disk_scheduler_->Schedule({false,pages_[ind].GetData(),pages_[ind].page_id_,std::move(promise)});
     future.get();
@@ -139,23 +138,25 @@ auto BufferPoolManager::FetchPage(page_id_t page_id, [[maybe_unused]] AccessType
 }
 
 auto BufferPoolManager::UnpinPage(page_id_t page_id, bool is_dirty, [[maybe_unused]] AccessType access_type) -> bool {
+   latch_.lock();
     if(page_table_.find(page_id)==page_table_.end()) 
     {
+    latch_.unlock();
     return false;
     }
     Page *curr =&pages_[page_table_[page_id]];  
-      if(curr->pin_count_<=0) 
-      {
-      return false;
-      }
-      latch_.lock();
-      curr->pin_count_--;
-      if(!curr->is_dirty_&&is_dirty) curr->is_dirty_=is_dirty;
-      if(curr->pin_count_==0)//evict 
-      {
-        replacer_->SetEvictable(page_table_[page_id],true);
-      }
+    if(curr->pin_count_<=0) 
+    {
       latch_.unlock();
+      return false;
+    }
+    curr->pin_count_--;
+    if(!curr->is_dirty_&&is_dirty) curr->is_dirty_=is_dirty;
+    if(curr->pin_count_==0)//evict 
+    {
+      replacer_->SetEvictable(page_table_[page_id],true);
+    }
+    latch_.unlock();
     
   return true;
 }
@@ -196,28 +197,29 @@ void BufferPoolManager::FlushAllPages() {
 }
 
 auto BufferPoolManager::DeletePage(page_id_t page_id) -> bool {
+    latch_.lock();
     if(page_table_.find(page_id)==page_table_.end()) 
     {
-
+    latch_.unlock();
     return true;
     }
      Page *dp=&pages_[page_table_[page_id]];
-       if(dp->pin_count_>0) 
-       {
-
-       return false;//is pinned
-       }
-       latch_.lock();
-         replacer_->Remove(page_table_[page_id]); //stop track
-         free_list_.push_back(page_table_[page_id]);//add to freelist       
-         page_table_.erase(page_id);//delete from table
-         
-         dp->ResetMemory();//reset
-         dp->pin_count_=0;
-         dp->is_dirty_=false;
-         
-         DeallocatePage(page_id);
+     if(dp->pin_count_>0) 
+     {
        latch_.unlock();
+       return false;//is pinned
+     }
+
+     replacer_->Remove(page_table_[page_id]); //stop track
+     free_list_.push_back(page_table_[page_id]);//add to freelist       
+     page_table_.erase(page_id);//delete from table
+         
+     dp->ResetMemory();//reset
+     dp->pin_count_=0;
+     dp->is_dirty_=false;
+         
+     DeallocatePage(page_id);
+     latch_.unlock();
          return true;
 }
 
@@ -227,8 +229,6 @@ auto BufferPoolManager::FetchPageBasic(page_id_t page_id) -> BasicPageGuard {
  Page *fetched_page = FetchPage(page_id);
     return {this,fetched_page};
 //return {this, nullptr}; 
-
-
 }
 
 auto BufferPoolManager::FetchPageRead(page_id_t page_id) -> ReadPageGuard {
@@ -236,7 +236,6 @@ auto BufferPoolManager::FetchPageRead(page_id_t page_id) -> ReadPageGuard {
     return {this,fetched_page};
 }
 
-int cnt = 0;
 auto BufferPoolManager::FetchPageWrite(page_id_t page_id) -> WritePageGuard {
  Page *fetched_page = FetchPage(page_id);
     return {this,fetched_page};
