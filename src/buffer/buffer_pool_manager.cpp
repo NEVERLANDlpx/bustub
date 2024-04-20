@@ -72,7 +72,7 @@ auto BufferPoolManager::NewPage(page_id_t *page_id) -> Page * {
     pages_[ind].ResetMemory();
     pages_[ind].page_id_=p->page_id_;
     pages_[ind].pin_count_=1;
-       
+      
     replacer_->RecordAccess(ind);
     replacer_->SetEvictable(ind,false);
   
@@ -185,13 +185,9 @@ auto BufferPoolManager::FlushPage(page_id_t page_id) -> bool {
 
 void BufferPoolManager::FlushAllPages() {
   latch_.lock();
-  for (auto id : page_table_) {
-    Page *fp=&pages_[id.second];  
-    auto promise = disk_scheduler_->CreatePromise();
-    auto future = promise.get_future();
-    disk_scheduler_->Schedule({true, fp->data_, fp->page_id_, std::move(promise)});
-    future.get();
-    fp->is_dirty_ = false;
+  for (auto id : page_table_) 
+  {
+  bool flag=FlushPage(id.first);
   }
   latch_.unlock();
 }
