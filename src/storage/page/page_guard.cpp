@@ -7,84 +7,78 @@ BasicPageGuard::BasicPageGuard(BasicPageGuard &&that) noexcept {
     bpm_ = std::exchange(that.bpm_, nullptr);
     page_ = std::exchange(that.page_, nullptr);
     is_dirty_ = std::exchange(that.is_dirty_, false);
+    origin_ = std::exchange( that.origin_ , false);
+
 }
 
 void BasicPageGuard::Drop() {
- if (page_ && bpm_) {
-    /*    if (is_dirty_) {
-            bpm_->FlushPage(page_->GetPageId());
-        }
-     */
-        bpm_->UnpinPage(page_->GetPageId(), is_dirty_);
-        bpm_ = nullptr;
-        page_ = nullptr;
-        is_dirty_ = false;
-    }
+  if (!origin_) {
+    return;
+  }
+  bpm_->UnpinPage(page_->GetPageId(), is_dirty_);
+  origin_ = false;
 }
 
-auto BasicPageGuard::operator=(BasicPageGuard &&that) noexcept -> BasicPageGuard & { 
- if (this != &that) { // 检查自赋值
-        // 释放当前对象持有的资源
-        Drop();
+auto BasicPageGuard::operator=(BasicPageGuard &&that) noexcept -> BasicPageGuard & {
+  // Drop();
+    bpm_ = std::exchange(that.bpm_, nullptr);
+    page_ = std::exchange(that.page_, nullptr);
+    is_dirty_ = std::exchange(that.is_dirty_, false);
+    origin_ = std::exchange( that.origin_ , false);
 
-        // 将新对象的资源移动到当前对象
-        bpm_ = std::exchange(that.bpm_, nullptr);
-        page_ = std::exchange(that.page_, nullptr);
-        is_dirty_ = std::exchange(that.is_dirty_, false);
-    }
-    return *this;
+  return *this;
 }
 
-BasicPageGuard::~BasicPageGuard(){
-   if(bpm_&&page_) Drop();
-};  // NOLINT
+BasicPageGuard::~BasicPageGuard() { Drop(); };  // NOLINT
 
-auto BasicPageGuard::UpgradeRead() -> ReadPageGuard { 
- return ReadPageGuard(bpm_, page_);
-//return {bpm_, page_}; 
-}
-auto BasicPageGuard::UpgradeWrite() -> WritePageGuard { 
-return WritePageGuard(bpm_, page_);
-//return {bpm_, page_}; 
+auto BasicPageGuard::UpgradeRead() -> ReadPageGuard {
+  origin_ = false;
+  return {bpm_, page_};
 }
 
-ReadPageGuard::ReadPageGuard(BufferPoolManager *bpm, Page *page) :guard_(bpm, page){ guard_.page_->RLatch(); }
+auto BasicPageGuard::UpgradeWrite() -> WritePageGuard {
+  origin_ = false;
+  return {bpm_, page_};
+}
 
-ReadPageGuard::ReadPageGuard(ReadPageGuard &&that) noexcept : guard_(std::move(that.guard_)) {   guard_.page_->RLatch(); }
+ReadPageGuard::ReadPageGuard(BufferPoolManager *bpm, Page *page) : guard_(bpm, page) { page->RLatch(); }
 
-auto ReadPageGuard::operator=(ReadPageGuard &&that) noexcept -> ReadPageGuard & { 
-   guard_ = std::move(that.guard_);
+ReadPageGuard::ReadPageGuard(ReadPageGuard &&that) noexcept = default;
 
-return *this; }
+auto ReadPageGuard::operator=(ReadPageGuard &&that) noexcept -> ReadPageGuard & {
+  // Drop();
+ guard_ = std::move(that.guard_);
+  guard_.origin_ = std::exchange( that.guard_.origin_, false);
+  return *this;
+} 
 
 void ReadPageGuard::Drop() {
+  if (guard_.origin_) {
     guard_.page_->RUnlatch();
-     guard_.Drop();
+    guard_.Drop();
+  }
 }
+ReadPageGuard::~ReadPageGuard() { Drop(); }  // NOLINT
 
-ReadPageGuard::~ReadPageGuard() {
-   if(guard_.bpm_&&guard_.page_)  Drop();
-}  // NOLINT
+WritePageGuard::WritePageGuard(BufferPoolManager *bpm, Page *page) : guard_(bpm, page) { page->WLatch(); }
 
-WritePageGuard::WritePageGuard(BufferPoolManager *bpm, Page *page): guard_(bpm, page) {    guard_.page_->WLatch();  }
-
-WritePageGuard::WritePageGuard(WritePageGuard &&that) noexcept :guard_(std::move(that.guard_)) {   guard_.page_->WLatch();}
-
+WritePageGuard::WritePageGuard(WritePageGuard &&that) noexcept = default;
 
 auto WritePageGuard::operator=(WritePageGuard &&that) noexcept -> WritePageGuard & {
- if (this != &that) {
-        guard_ = std::move(that.guard_);
-    }
-    return *this;
-  }
+  // Drop();
+  guard_ = std::move(that.guard_);
+  guard_.origin_ = std::exchange(that.guard_.origin_, false);
 
-void WritePageGuard::Drop() {
-    guard_.page_->WUnlatch();
-  guard_.Drop();
+  return *this;
 }
 
-WritePageGuard::~WritePageGuard() {
- if(guard_.bpm_&&guard_.page_)  Drop();
-}  // NOLINT
+void WritePageGuard::Drop() {
+  if (guard_.origin_) {
+    guard_.page_->WUnlatch();
+    guard_.Drop();
+  }
+}
+
+WritePageGuard::~WritePageGuard() { Drop(); }  // NOLINT
 
 }  // namespace bustub
