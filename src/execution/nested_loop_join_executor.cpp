@@ -19,15 +19,81 @@ namespace bustub {
 NestedLoopJoinExecutor::NestedLoopJoinExecutor(ExecutorContext *exec_ctx, const NestedLoopJoinPlanNode *plan,
                                                std::unique_ptr<AbstractExecutor> &&left_executor,
                                                std::unique_ptr<AbstractExecutor> &&right_executor)
-    : AbstractExecutor(exec_ctx) {
+    : AbstractExecutor(exec_ctx),
+      plan_(plan),
+      left_executor_(std::move(left_executor)),
+      right_executor_(std::move(right_executor)) {
   if (!(plan->GetJoinType() == JoinType::LEFT || plan->GetJoinType() == JoinType::INNER)) {
     // Note for 2023 Fall: You ONLY need to implement left join and inner join.
     throw bustub::NotImplementedException(fmt::format("join type {} not supported", plan->GetJoinType()));
   }
 }
 
-void NestedLoopJoinExecutor::Init() { throw NotImplementedException("NestedLoopJoinExecutor is not implemented"); }
+void NestedLoopJoinExecutor::Init() { 
+//throw NotImplementedException("NestedLoopJoinExecutor is not implemented"); 
+  left_executor_->Init();
+  right_executor_->Init();
+  Tuple tuple;
+  RID emit_rid;
+   while (right_executor_->Next(&tuple, &emit_rid)) {
+    right_tuples_.push_back(tuple);
+  }
+}
 
-auto NestedLoopJoinExecutor::Next(Tuple *tuple, RID *rid) -> bool { return false; }
+auto NestedLoopJoinExecutor::Next(Tuple *tuple, RID *rid) -> bool {
+ RID emit_rid;
+  bool flag=false;
+  while(true)
+  {
+    if(rend_)
+    {
+      if(!left_executor_->Next(&left_now_,&emit_rid)) break;
+    }  //have done
+    if(rend_) 
+    {
+      rend_=false;
+      rind_=0;
+    }
+    std::vector<Value> values;
+    for(auto i=rind_;i<right_tuples_.size();i++)
+    {
+      if(i==right_tuples_.size()-1) 
+      {rend_=true;}
+      auto result = plan_->Predicate()->EvaluateJoin(&left_now_, left_executor_->GetOutputSchema(),& right_tuples_[i],right_executor_->GetOutputSchema());
+ 
+      if(result.IsNull()||!result.GetAs<bool>()) continue;  //cannot match
+      flag=true;//left has matched right
+      for(auto id=0;id<left_executor_->GetOutputSchema().GetColumnCount();id++) 
+      {
+        values.push_back(left_now_.GetValue(&left_executor_->GetOutputSchema(),id));
+      }
+      for(auto id=0;id<right_executor_->GetOutputSchema().GetColumnCount();id++)
+      {
+        values.push_back(right_tuples_[id].GetValue(&right_executor_->GetOutputSchema(),id));
+      }      
+      rind_=i+1;
+      break;   //generate tuple done
+    }
+ 
+    if(!flag&&plan_->GetJoinType() == JoinType::LEFT) //remain left and let right null
+    {
+      flag=true;
+      for(auto id=0;id<left_executor_->GetOutputSchema().GetColumnCount();id++) 
+      {
+        values.push_back(left_now_.GetValue(&left_executor_->GetOutputSchema(),id));
+      }
+      for (uint32_t id= 0; id < right_executor_->GetOutputSchema().GetColumnCount(); id++) {
+        values.push_back(ValueFactory::GetNullValueByType(right_executor_->GetOutputSchema().GetColumn(id).GetType()));
+      }      
+    }
+    if(flag)
+    {
+      *tuple=Tuple(values,&GetOutputSchema());
+      return true;
+    }
+  }
+  return false;    
+   //return false; 
+}
 
 }  // namespace bustub
