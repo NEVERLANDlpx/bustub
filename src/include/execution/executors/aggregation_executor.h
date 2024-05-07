@@ -71,13 +71,50 @@ class SimpleAggregationHashTable {
    * @param input The input value
    */
   void CombineAggregateValues(AggregateValue *result, const AggregateValue &input) {
-    for (uint32_t i = 0; i < agg_exprs_.size(); i++) {
+    for (uint32_t i = 0; i < agg_exprs_.size(); i++) {  //循环遍历所有的聚合表达式
       switch (agg_types_[i]) {
         case AggregationType::CountStarAggregate:
+            result->aggregates_[i]=result->aggregates_[i].Add(ValueFactory::GetIntegerValue(1));
+            break;
         case AggregationType::CountAggregate:
+            if (result->aggregates_[i].IsNull()) 
+            {
+              result->aggregates_[i] = ValueFactory::GetIntegerValue(0);
+            }
+            if (!input.aggregates_[i].IsNull()) 
+            {
+              result->aggregates_[i] = result->aggregates_[i].Add(ValueFactory::GetIntegerValue(1));
+            }
+            break;       
         case AggregationType::SumAggregate:
+            if (result->aggregates_[i].IsNull()) 
+            {
+              result->aggregates_[i] = input.aggregates_[i];
+            } 
+            else if (!input.aggregates_[i].IsNull()) 
+            {
+              result->aggregates_[i] = result->aggregates_[i].Add(input.aggregates_[i]);
+            }
+          break;
         case AggregationType::MinAggregate:
+            if (result->aggregates_[i].IsNull()) 
+            {
+              result->aggregates_[i] = input.aggregates_[i];
+            } 
+            else if (!input.aggregates_[i].IsNull()) 
+            {
+              result->aggregates_[i] = result->aggregates_[i].Min(input.aggregates_[i]);
+            }
+            break;        
         case AggregationType::MaxAggregate:
+          if (result->aggregates_[i].IsNull()) 
+          {
+            result->aggregates_[i] = input.aggregates_[i];
+          } 
+          else if (!input.aggregates_[i].IsNull()) 
+          {
+            result->aggregates_[i] = result->aggregates_[i].Max(input.aggregates_[i]);
+          }
           break;
       }
     }
@@ -204,8 +241,10 @@ class AggregationExecutor : public AbstractExecutor {
 
   /** Simple aggregation hash table */
   // TODO(Student): Uncomment SimpleAggregationHashTable aht_;
-
+  SimpleAggregationHashTable aht_;
+  
   /** Simple aggregation hash table iterator */
-  // TODO(Student): Uncomment SimpleAggregationHashTable::Iterator aht_iterator_;
+  // TODO(Student): Uncomment SimpleAggregationHashTable::Iterator aht_iterator_; simpleaggregATionhashtable;;iterator aht-iterator-;
+  SimpleAggregationHashTable::Iterator aht_iterator_;
 };
 }  // namespace bustub
