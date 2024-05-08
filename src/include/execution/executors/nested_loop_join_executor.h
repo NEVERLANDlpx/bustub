@@ -63,6 +63,7 @@ class NestedLoopJoinExecutor : public AbstractExecutor {
   std::vector<Tuple> right_tuples_;
   int rind_ = 0;
   bool rend_{true};
+  bool flag_{false};
   
 };
 
