@@ -53,8 +53,10 @@ auto NestedLoopJoinExecutor::Next(Tuple *tuple, RID *rid) -> bool {
     {
       rend_=false;
       rind_=0;
+      flag_=false;
     }
     std::vector<Value> values;
+    if(right_tuples_.size()==0){rend_=true;}
     for(auto i=rind_;i<right_tuples_.size();i++)
     {
       if(i==right_tuples_.size()-1) 
@@ -63,19 +65,20 @@ auto NestedLoopJoinExecutor::Next(Tuple *tuple, RID *rid) -> bool {
  
       if(result.IsNull()||!result.GetAs<bool>()) continue;  //cannot match
       flag=true;//left has matched right
+      flag_=true;
       for(auto id=0;id<left_executor_->GetOutputSchema().GetColumnCount();id++) 
       {
         values.push_back(left_now_.GetValue(&left_executor_->GetOutputSchema(),id));
       }
       for(auto id=0;id<right_executor_->GetOutputSchema().GetColumnCount();id++)
       {
-        values.push_back(right_tuples_[id].GetValue(&right_executor_->GetOutputSchema(),id));
+        values.push_back(right_tuples_[i].GetValue(&right_executor_->GetOutputSchema(),id));
       }      
       rind_=i+1;
       break;   //generate tuple done
     }
  
-    if(!flag&&plan_->GetJoinType() == JoinType::LEFT) //remain left and let right null
+    if(!flag_&&plan_->GetJoinType() == JoinType::LEFT) //remain left and let right null
     {
       flag=true;
       for(auto id=0;id<left_executor_->GetOutputSchema().GetColumnCount();id++) 
