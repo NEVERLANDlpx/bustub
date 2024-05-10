@@ -19,9 +19,39 @@
 #include "execution/executors/abstract_executor.h"
 #include "execution/plans/hash_join_plan.h"
 #include "storage/table/tuple.h"
+//add
+#include "type/value_factory.h"
+#include "common/util/hash_util.h"
+namespace bustub{
+struct JoinKey {
+  std::vector<Value> attrs_;
+  auto operator==(const JoinKey &other) const -> bool {
+    for (uint32_t i = 0; i < other.attrs_.size(); i++) {
+      if (attrs_[i].CompareEquals(other.attrs_[i]) != CmpBool::CmpTrue) {
+        return false;
+      }
+    }
+    return true;
+  }
+};
+}
+namespace std {
 
+template <>
+struct hash<bustub::JoinKey> {
+  auto operator()(const bustub::JoinKey &agg_key) const -> std::size_t {
+    size_t curr_hash = 0;
+    for (const auto &key : agg_key.attrs_) {
+      if (!key.IsNull()) {
+        curr_hash = bustub::HashUtil::CombineHashes(curr_hash, bustub::HashUtil::HashValue(&key));
+      }
+    }
+    return curr_hash;
+  }
+};
+
+} 
 namespace bustub {
-
 /**
  * HashJoinExecutor executes a nested-loop JOIN on two tables.
  */
@@ -54,6 +84,12 @@ class HashJoinExecutor : public AbstractExecutor {
  private:
   /** The HashJoin plan node to be executed. */
   const HashJoinPlanNode *plan_;
+  
+  std::unique_ptr<AbstractExecutor> left_executor_;
+  std::unique_ptr<AbstractExecutor> right_executor_;
+  std::vector<Tuple> results_;
+  std::unordered_map<JoinKey, std::vector<Tuple>> hj_table_;
+  int idx_;
 };
 
 }  // namespace bustub
