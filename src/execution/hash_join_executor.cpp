@@ -70,7 +70,6 @@ void HashJoinExecutor::Init() {
         {
           tuple_vals.push_back(tuple.GetValue(&schema, i));
         }
-        Tuple tmp(tuple_vals, &GetOutputSchema());
         results_.push_back(Tuple{tuple_vals, &GetOutputSchema()});
       }
     }
@@ -88,7 +87,6 @@ void HashJoinExecutor::Init() {
         {
           tuple_vals.push_back(ValueFactory::GetNullValueByType(schema.GetColumn(i).GetType()));
         }
-        Tuple tmp(tuple_vals, &GetOutputSchema());
         results_.push_back(Tuple{tuple_vals, &GetOutputSchema()});
     } 
 
@@ -100,6 +98,7 @@ auto HashJoinExecutor::Next(Tuple *tuple, RID *rid) -> bool {
    if(idx_>=results_.size()) return false;
    *tuple=results_[idx_];
    idx_++;
+   return true;
 }
 
 }  // namespace bustub
