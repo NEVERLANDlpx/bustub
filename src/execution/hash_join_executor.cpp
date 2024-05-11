@@ -43,7 +43,7 @@ void HashJoinExecutor::Init() {
     {
       vals.push_back(expr->Evaluate(&todo_tuple, right_executor_->GetOutputSchema()));
     }
-    JoinKey key{vals};
+    HashjoinKey key{vals};
     hj_table_[key].push_back(todo_tuple);
   }
   while (left_executor_->Next(&todo_tuple, &emit_rid)) 
@@ -53,22 +53,20 @@ void HashJoinExecutor::Init() {
     {
       vals.push_back(expr->Evaluate(&todo_tuple, left_executor_->GetOutputSchema()));
     }
-    JoinKey key{vals};   
+    HashjoinKey key{vals};   
     if (hj_table_.count(key) ) //can find in table 
     {
       auto tuples = hj_table_[key];
       for (auto tuple: tuples) 
       {
         std::vector<Value> tuple_vals;
-        auto schema = left_executor_->GetOutputSchema();
-        for (int i = 0; i < schema.GetColumnCount(); i++) 
+        for (int i=0;i<left_executor_->GetOutputSchema().GetColumnCount(); i++) 
         {
-          tuple_vals.push_back(todo_tuple.GetValue(&schema, i));
+          tuple_vals.push_back(todo_tuple.GetValue(&left_executor_->GetOutputSchema(), i));
         }
-        schema = right_executor_->GetOutputSchema();
-        for (int i = 0; i < schema.GetColumnCount(); i++) 
+        for (int i=0;i<right_executor_->GetOutputSchema().GetColumnCount(); i++) 
         {
-          tuple_vals.push_back(tuple.GetValue(&schema, i));
+          tuple_vals.push_back(tuple.GetValue(&right_executor_->GetOutputSchema(), i));
         }
         results_.push_back(Tuple{tuple_vals, &GetOutputSchema()});
       }
@@ -77,15 +75,13 @@ void HashJoinExecutor::Init() {
     {
  
         std::vector<Value> tuple_vals;
-        auto schema = left_executor_->GetOutputSchema();
-        for (int i = 0; i < schema.GetColumnCount(); i++) 
+        for (int i=0;i< left_executor_->GetOutputSchema().GetColumnCount(); i++) 
         {
-          tuple_vals.push_back(todo_tuple.GetValue(&schema, i));
+          tuple_vals.push_back(todo_tuple.GetValue(&left_executor_->GetOutputSchema(), i));
         }
-        schema = right_executor_->GetOutputSchema();
-        for (int i = 0; i < schema.GetColumnCount(); i++) 
+        for (int i=0;i<right_executor_->GetOutputSchema().GetColumnCount(); i++) 
         {
-          tuple_vals.push_back(ValueFactory::GetNullValueByType(schema.GetColumn(i).GetType()));
+          tuple_vals.push_back(ValueFactory::GetNullValueByType(right_executor_->GetOutputSchema().GetColumn(i).GetType()));
         }
         results_.push_back(Tuple{tuple_vals, &GetOutputSchema()});
     } 
