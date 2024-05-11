@@ -16,37 +16,38 @@
 #include "type/type_id.h"
 //add
 #include "execution/expressions/logic_expression.h"
-
 namespace bustub {
-bool SolveExpression(const AbstractExpressionRef expr, std::vector<AbstractExpressionRef> &vel,std::vector<AbstractExpressionRef> &ver) {
-                     
+
+bool canopt(const AbstractExpressionRef expr, std::vector<AbstractExpressionRef> &left,std::vector<AbstractExpressionRef> &right) {
   if (expr == nullptr) 
   {
     return false;
   }
-  if (const auto *lexpr = dynamic_cast<const LogicExpression *>(expr.get()); lexpr != nullptr) 
+  auto *logi_expr = dynamic_cast<const LogicExpression *>(expr.get());
+  auto *cmp_expr = dynamic_cast<const ComparisonExpression *>(expr.get()); 
+  if (logi_expr != nullptr) 
   {
-    if (lexpr->logic_type_ == LogicType::And) 
+    if (logi_expr->logic_type_ == LogicType::And) 
     {
-      return SolveExpression(lexpr->children_[0], vel, ver) && SolveExpression(lexpr->children_[1], vel, ver);
+      return canopt(logi_expr->children_[0], left,right) && canopt(logi_expr->children_[1],left,right);
     }
   } 
-  else if (const auto *cexpr = dynamic_cast<const ComparisonExpression *>(expr.get()); cexpr != nullptr) 
+  else if (cmp_expr != nullptr) 
   {
-    const auto *l = dynamic_cast<const ColumnValueExpression *>(cexpr->children_[0].get());
-    const auto *r = dynamic_cast<const ColumnValueExpression *>(cexpr->children_[1].get());
+    auto *l = dynamic_cast<const ColumnValueExpression *>(cmp_expr->children_[0].get());
+    auto *r = dynamic_cast<const ColumnValueExpression *>(cmp_expr->children_[1].get());
     if (l != nullptr && r != nullptr) 
     {
       if (l->GetTupleIdx() == 0 && r->GetTupleIdx() == 1) 
       {
-        vel.push_back(cexpr->children_[0]);
-        ver.push_back(cexpr->children_[1]);
+        left.push_back(cmp_expr->children_[0]);
+        right.push_back(cmp_expr->children_[1]);
         return true;
       }
-      if (r->GetTupleIdx() == 0 && l->GetTupleIdx() == 1) 
+      else if (r->GetTupleIdx() == 0 && l->GetTupleIdx() == 1) 
       {
-        vel.push_back(cexpr->children_[1]);
-        ver.push_back(cexpr->children_[0]);
+        left.push_back(cmp_expr->children_[1]);
+        right.push_back(cmp_expr->children_[0]);
         return true;
       }
     }
@@ -55,10 +56,7 @@ bool SolveExpression(const AbstractExpressionRef expr, std::vector<AbstractExpre
 }
 
 auto Optimizer::OptimizeNLJAsHashJoin(const AbstractPlanNodeRef &plan) -> AbstractPlanNodeRef {
-  // TODO(student): implement NestedLoopJoin -> HashJoin optimizer rule
-  // Note for 2023 Fall: You should support join keys of any number of conjunction of equi-condistions:
-  // E.g. <column expr> = <column expr> AND <column expr> = <column expr> AND ...
-    std::vector<AbstractPlanNodeRef> children;
+  std::vector<AbstractPlanNodeRef> children;
   for (const auto &child : plan->GetChildren()) 
   {
     children.emplace_back(OptimizeNLJAsHashJoin(child));
@@ -66,17 +64,20 @@ auto Optimizer::OptimizeNLJAsHashJoin(const AbstractPlanNodeRef &plan) -> Abstra
   auto optimized_plan = plan->CloneWithChildren(std::move(children));
   if (optimized_plan->GetType() == PlanType::NestedLoopJoin) 
   {
-    const auto &loopplan = dynamic_cast<const NestedLoopJoinPlanNode &>(*optimized_plan);
-    std::vector<AbstractExpressionRef> lve;
-    std::vector<AbstractExpressionRef> rve;
-    if (SolveExpression(loopplan.predicate_, lve, rve)) 
+    const auto &old_plan = dynamic_cast<const NestedLoopJoinPlanNode &>(*optimized_plan);
+    std::vector<AbstractExpressionRef> lexpr;
+    std::vector<AbstractExpressionRef> rexpr;
+    if (canopt(old_plan.predicate_, lexpr, rexpr)) 
     {
-      return std::make_shared<HashJoinPlanNode>(loopplan.output_schema_, loopplan.GetLeftPlan(), loopplan.GetRightPlan(), lve, rve, loopplan.GetJoinType());       
+      return std::make_shared<HashJoinPlanNode>(old_plan.output_schema_, old_plan.GetLeftPlan(), old_plan.GetRightPlan(), lexpr, rexpr, old_plan.GetJoinType());
+                                               
     }
   }
 
   return optimized_plan;
- // return plan;
+  // TODO(student): implement NestedLoopJoin -> HashJoin optimizer rule
+  // Note for 2023 Fall: You should support join keys of any number of conjunction of equi-condistions:
+  // E.g. <column expr> = <column expr> AND <column expr> = <column expr> AND ...
 }
 
 }  // namespace bustub
