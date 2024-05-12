@@ -87,7 +87,9 @@ void WindowFunctionExecutor::doit(std::vector<Value> &ret) {
    // 逆序处理所有操作，仅遍历一次
     for (int i =size-2;i>=0;i--) 
     {
-      if (!cmp(tuple_with_id[key_pair.second[i]], tuple_with_id[key_pair.second[i + 1]]) && !cmp(tuple_with_id[key_pair.second[i + 1]], tuple_with_id[key_pair.second[i]]))  vals[i]=vals[i+1];
+      if(cmp(tuple_with_id[key_pair.second[i]], tuple_with_id[key_pair.second[i + 1]]) ) continue;
+      if(cmp(tuple_with_id[key_pair.second[i + 1]], tuple_with_id[key_pair.second[i]])) continue;
+      vals[i]=vals[i+1];
     }
 
    }
@@ -97,7 +99,9 @@ void WindowFunctionExecutor::doit(std::vector<Value> &ret) {
     for (int i=1;i< size;i++) 
    {
    //如果相邻元素相等，当前元素的值设为前一个元素的值。
-    if (!cmp(tuple_with_id[key_pair.second[i]], tuple_with_id[key_pair.second[i - 1]]) && !cmp(tuple_with_id[key_pair.second[i - 1]], tuple_with_id[key_pair.second[i]])) vals[i]=vals[i-1];
+   if(cmp(tuple_with_id[key_pair.second[i]], tuple_with_id[key_pair.second[i - 1]])) continue;
+   if(cmp(tuple_with_id[key_pair.second[i - 1]], tuple_with_id[key_pair.second[i]])) continue;
+    vals[i]=vals[i-1];
    }
   }
       for (int i=size-1;i>= 0;i--) 
@@ -109,6 +113,7 @@ void WindowFunctionExecutor::doit(std::vector<Value> &ret) {
 
 void WindowFunctionExecutor::Init() {
   // throw NotImplementedException("WindowFunctionExecutor is not implemented");
+  results_.resize(plan_->columns_.size());
   child_executor_->Init();
   Tuple todo_tuple;
   RID emit_rid;
@@ -120,7 +125,7 @@ void WindowFunctionExecutor::Init() {
     rids_.push_back(emit_rid);
   }
   //save the tuple information
-  results_.resize(plan_->columns_.size());
+ 
   
   for (int i=0;i<plan_->columns_.size();i++) 
   {
