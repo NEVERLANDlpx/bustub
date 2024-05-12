@@ -8,21 +8,18 @@
 #include "execution/plans/seq_scan_plan.h"
 namespace bustub {
 
-bool canopt(const AbstractExpressionRef expr, std::vector<std::pair<uint32_t, AbstractExpressionRef> > &map_) {
-  if (expr == nullptr) 
-  {
-    return false;
-  }
-  auto *logi_expr = dynamic_cast<const LogicExpression *>(expr.get()); 
+bool canopt(const AbstractExpressionRef expr, std::vector<std::pair<uint32_t, AbstractExpressionRef> > &exprs) {
+  if (expr == nullptr) return false;
+  auto *logic_expr = dynamic_cast<const LogicExpression *>(expr.get()); 
   auto *cmp_expr = dynamic_cast<const ComparisonExpression *>(expr.get());
-  if (logi_expr != nullptr) 
+  if (logic_expr != nullptr) 
   {
-    if (logi_expr->logic_type_ == LogicType::Or) 
+    if (logic_expr->logic_type_ == LogicType::Or) 
     {
-      return canopt(logi_expr->children_[0], map_) && canopt(logi_expr->children_[1], map_);
+      return canopt(logic_expr->children_[0], exprs) && canopt(logic_expr->children_[1], exprs);
     }
   } 
-  else if (cmp_expr != nullptr) 
+  else if ( cmp_expr != nullptr) 
   {
     auto *l1 = dynamic_cast<const ColumnValueExpression *>(cmp_expr->children_[0].get());
     auto *l2 = dynamic_cast<const ConstantValueExpression *>(cmp_expr->children_[0].get());
@@ -32,33 +29,49 @@ bool canopt(const AbstractExpressionRef expr, std::vector<std::pair<uint32_t, Ab
     {
       if (l1->GetTupleIdx() == 0) 
       {
-        for (auto pair : map_) 
+        bool flag = false;
+        for (int i=0;i< exprs.size();i++) 
         {
-          if (pair.first != l1->GetColIdx()) return false;
-          auto now_val= dynamic_cast<const ConstantValueExpression *>(pair.second.get())->val_;
-          if (now_val.CompareEquals( r1->val_) == CmpBool::CmpTrue) return true;  
+          if (exprs[i].first != l1->GetColIdx()) 
+          {
+            return false;
+          }
+          auto val = dynamic_cast<const ConstantValueExpression *>(exprs[i].second.get())->val_;
+          if (val.CompareEquals(r1->val_) == CmpBool::CmpTrue) flag = true;
         }
-        map_.push_back(std::make_pair(l1->GetColIdx(), cmp_expr->children_[1]));  //cannot
- 
+        if (!flag) 
+        {
+          exprs.push_back(std::make_pair(l1->GetColIdx(), cmp_expr->children_[1]));
+        }
+        return true;
       }
     }
+    
     if (l2 != nullptr && r2 != nullptr) 
     {
       if (r2->GetTupleIdx() == 0) 
       {
-        for (auto pair: map_) 
+        bool flag = false;
+        for (int i=0;i< exprs.size();i++) 
         {
-          if (pair.first != r2->GetColIdx()) return false;
-          auto now_val= dynamic_cast<const ConstantValueExpression *>(pair.second.get())->val_;
-          if (now_val.CompareEquals(l2->val_) == CmpBool::CmpTrue) return true;
+          if (exprs[i].first != r2->GetColIdx()) 
+          {
+            return false;
+          }
+          auto val = dynamic_cast<const ConstantValueExpression *>(exprs[i].second.get())->val_;
+          if (val.CompareEquals( l2->val_) == CmpBool::CmpTrue)  flag = true;
         }
-        map_.push_back(std::make_pair(r2->GetColIdx(), cmp_expr->children_[0]));  //cannot
+        if (!flag) 
+        {
+          exprs.push_back(std::make_pair(r2->GetColIdx(), cmp_expr->children_[0]));
+        }
+        return true;
       }
     }
+  
   }
   return false;
 }
-
 auto Optimizer::OptimizeSeqScanAsIndexScan(const bustub::AbstractPlanNodeRef &plan) -> AbstractPlanNodeRef {
   // TODO(student): implement seq scan with predicate -> index scan optimizer rule
   // The Filter Predicate Pushdown has been enabled for you in optimizer.cpp when forcing starter rule
