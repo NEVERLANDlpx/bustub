@@ -13,50 +13,38 @@
 
 namespace bustub {
 IndexScanExecutor::IndexScanExecutor(ExecutorContext *exec_ctx, const IndexScanPlanNode *plan)
-    //: AbstractExecutor(exec_ctx) {}
-    :AbstractExecutor(exec_ctx),
-     plan_(plan),
-     table_info_(exec_ctx_->GetCatalog()->GetTable(plan->GetIndexOid())),
-     index_info_{exec_ctx_->GetCatalog()->GetIndex(plan_->index_oid_)},
-     htable_{dynamic_cast<HashTableIndexForTwoIntegerColumn *>(index_info_->index_.get())},
-     iter_(std::make_unique<TableIterator>(table_info_->table_->MakeIterator())) {
-    std::cout<<"haha"<<std::endl;
-}
-     
+    : AbstractExecutor(exec_ctx),
+      plan_(plan),
+      table_info_(exec_ctx->GetCatalog()->GetTable(plan->table_oid_)),
+      index_info_(exec_ctx->GetCatalog()->GetIndex(plan->index_oid_)) {}
 
 void IndexScanExecutor::Init() { 
-   //throw NotImplementedException("IndexScanExecutor is not implemented");
-   if(plan_->filter_predicate_!=nullptr){
-     const auto *right_expr =dynamic_cast<const ConstantValueExpression *>(plan_->filter_predicate_->children_[1].get());
-    Value v = right_expr->val_;
-    htable_->ScanKey(Tuple{{v}, index_info_->index_->GetKeySchema()}, &rids_, exec_ctx_->GetTransaction());
-    rid_iter_ = rids_.begin();
+  for (auto cons_key : plan_->pred_keys_) {
+    std::vector<RID> results;
+
+    std::vector<Column> cols;
+    std::vector<Value> vals;
+    Schema tmpschema(cols);
+    Tuple tmptuple;
+    auto val = cons_key->Evaluate(&tmptuple, tmpschema);
+    cols.push_back(val.GetColumn());
+    vals.push_back(val);
+    Schema oneschema(cols);
+    index_info_->index_->ScanKey(Tuple{vals, &oneschema}, &results, exec_ctx_->GetTransaction());
+    for ( int i=0;i<results.size();i++) 
+    {
+      rids_.push_back(results[i]);
     }
+  }
+    idx_ = 0; 
 }
 
-auto IndexScanExecutor::Next(Tuple *tuple, RID *rid) -> bool { 
-  std::cout<<"start"<<std::endl;
-  if(plan_->filter_predicate_!=nullptr)
-  {
-    if (rid_iter_ != rids_.end()) {
-      *rid = *rid_iter_;
-      *tuple = table_info_->table_->GetTuple(*rid).second;
-      rid_iter_++;
-      return true;
-    }
-    return false;
-   }
-   
-  if ((*iter_).IsEnd()) {
-    return false;
-  }
-  *rid = (*iter_).GetRID();
-  *tuple = table_info_->table_->GetTuple(*rid).second;
-  ++(*iter_);
-
+auto IndexScanExecutor::Next(Tuple *tuple, RID *rid) -> bool {
+  if (idx_>= rids_.size()) return false;
+    *rid = rids_[idx_];
+  *tuple = (table_info_->table_->GetTuple(rids_[idx_])).second;
+  idx_++;
   return true;
-    
-//return false; 
 }
 
 }  // namespace bustub
