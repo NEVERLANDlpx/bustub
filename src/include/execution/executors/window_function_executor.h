@@ -19,7 +19,38 @@
 #include "execution/executors/abstract_executor.h"
 #include "execution/plans/window_plan.h"
 #include "storage/table/tuple.h"
+//add
+#include "common/util/hash_util.h"
+namespace bustub{
+struct CombineKey {
+  std::vector<Value> attrs_;
+  auto operator==(const CombineKey &other) const -> bool {
+    for (uint32_t i = 0; i < other.attrs_.size(); i++) {
+      if (attrs_[i].CompareEquals(other.attrs_[i]) != CmpBool::CmpTrue) {
+        return false;
+      }
+    }
+    return true;
+  }
+};
+}  // namespace bustub
 
+namespace std {
+
+template <>
+struct hash<bustub::CombineKey> {
+  auto operator()(const bustub::CombineKey &agg_key) const -> std::size_t {
+    size_t curr_hash = 0;
+    for (const auto &key : agg_key.attrs_) {
+      if (!key.IsNull()) {
+        curr_hash = bustub::HashUtil::CombineHashes(curr_hash, bustub::HashUtil::HashValue(&key));
+      }
+    }
+    return curr_hash;
+  }
+};
+
+}  // namespace std
 namespace bustub {
 
 /**
@@ -83,6 +114,10 @@ class WindowFunctionExecutor : public AbstractExecutor {
 
   /** @return The output schema for the window aggregation plan */
   auto GetOutputSchema() const -> const Schema & override { return plan_->OutputSchema(); }
+  
+  
+  void doit(std::vector<Value> &);
+                   
 
  private:
   /** The window aggregation plan node to be executed */
@@ -90,5 +125,14 @@ class WindowFunctionExecutor : public AbstractExecutor {
 
   /** The child executor from which tuples are obtained */
   std::unique_ptr<AbstractExecutor> child_executor_;
+  //add
+  std::vector<std::pair<Tuple, uint32_t> > tuple_with_id;
+  std::vector<RID> rids_;
+  WindowFunctionPlanNode::WindowFunction func;
+   std::vector<std::pair<OrderByType, AbstractExpressionRef> > sort_by_;
+  std::vector<std::vector<Value> > results_;
+  std::vector<std::pair<Tuple, RID> > ans_;
+  int id;
+
 };
 }  // namespace bustub
